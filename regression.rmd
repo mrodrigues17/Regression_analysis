@@ -1,0 +1,161 @@
+---
+title: "Regression Analysis for the Mtcars Dataset"
+author: "Max R"
+date: "10/24/2017"
+output:
+  html_document:
+    fig_caption: yes
+---
+
+```{r packages, message=FALSE, echo = FALSE}
+library(car)
+library(datasets)
+library(ggplot2)
+library(knitr)
+library(gridExtra)
+```
+
+
+##Executive Summary (abstract)
+The purpose of this report was to identify whether manual or automatic transmission cars are better for fuel economy as measured by the average number of miles a car can drive per one gallon of gasoline (MPG). While automatic transmission cars do technically have a lower MPG than manual transmission cars, this isn't a great interpretation. When weight was included in the model, the effect of transmission was made null. An explanation for this could be that manual cars tend to be smaller cars (perhaps sports cars) while automatic vehicles tend to bulkier. This means that MPG doesn't change as a function of the transmission, but rather transmission is more of a predictor of weight. The linear model of weight and quarter mile time predicting MPG is a better model that explains MPG variation that is also parsimonious.
+
+
+##Exploratory analysis and simple linear regression for MPG and transmission
+
+
+```{r fig.1, echo = FALSE}
+mtcars$transmission <- as.factor(mtcars$am)
+levels(mtcars$transmission) <- c("Automatic", "Manual")
+
+p1 <- ggplot(mtcars, aes(x = transmission, y = mpg)) + 
+        geom_boxplot() + 
+        xlab("Transmission") +
+        ylab("MPG") +
+        labs(caption = "Figure 1") +
+        ggtitle("MPG for Automatic vs. Manual Transmission") +
+        theme(text = element_text(size=8), 
+              plot.title = element_text(size = 10))
+
+mod <- lm(mpg ~ transmission, data = mtcars)
+mpg_stdres <- rstandard(mod)
+p2 <- ggplot(mtcars) + 
+        geom_qq(aes(sample= mpg_stdres)) +
+        xlab("Theoretical Quantiles") + 
+        ylab("Sample Quantiles") +
+        labs(caption = "Figure 2") +
+         ggtitle("Normal QQ Plot for Linear Model\n (transmission predicting MPG)") +
+         theme(text = element_text(size=8), 
+              plot.title = element_text(size = 10))
+
+grid.arrange(p1, p2, ncol =2)
+
+```
+
+```{r summary, echo = FALSE}
+mod <- lm(mpg ~ transmission, data = mtcars)
+kable(summary(mod)$coefficients, caption = "Linear Model Predicting MPG with Transmission")
+```
+
+
+Figure 1 is an exploratory plot showing the differences in MPG between automatic and manual transmission vehicles. 
+
+Figure 2 is a Quantile-Quantile plot showing that the data is normally distributed.
+
+
+Figure 1 shows that manual transmission cars have better gas mileage than automatic transmission cars, and it also appears that manual transmission cars have more variability in MPG. Table 1 further corroborates this by showing significant differences between the two transmissions. The model estimates an expected 7.24 increase in MPG for cars that have manual transmission compared to cars with an automatic transmission. That is, the mean MPG for automatic transmission cars is approximately 17.15 MPG and the mean MPG for manual transmission cars is approximately 24.39 MPG. These differences are significantly different according to the summary output (t-value = 4.1, $p$ < .001). The $R^2$ (not shown in the table) is .36, which indicates 36% of the variation in MPG is explained by transmission.
+
+##Investigating weight as a regressor
+Perhaps another variable better predicts fuel efficiency. The weight variable seems like it should have a strong relationship with gas mileage (heavier cars should have to utilize more gas). The correlation table below shows that weight has the highest correlation with mpg. Therefore, we can do some exploratory plotting and fit a linear model to see if transmission does predict weight.
+
+```{r cor_table, echo=FALSE}
+mtcars$am <- as.numeric(mtcars$am)
+cor_table <- cor(mtcars[,1:11], method = "pearson", use = "complete.obs")
+kable(cor_table[, 1:5], caption = "Correlations Table for all of the Variables") 
+kable(cor_table[, 6:11]) 
+
+
+```
+
+```{r weight_plot, echo = FALSE, fig.height=4}
+
+g1 <- ggplot(mtcars, aes(x = wt, y = mpg, color = transmission)) + 
+        geom_point() + 
+        xlab("Weight (thousands of pounds)") +
+        ylab("MPG") +
+        labs(color = "Transmission", caption = "Figure 3") +
+        scale_fill_discrete(labels = c("Automatic", "Manual")) + 
+        ggtitle("MPG vs Weight for Automatic\n& Manual Transmission Cars") + 
+        theme(text = element_text(size=9), 
+              plot.title = element_text(size = 10),
+              legend.position = "bottom")
+
+g2 <- ggplot(mtcars, aes(x = transmission, y = wt)) + 
+        geom_boxplot() + 
+        xlab("Transmission") +
+        ylab("Weight (thousands of pounds)") +
+        labs(caption = "Figure 4") +
+        ggtitle("Weight for Automatic vs. Manual Transmission") +
+        theme(text = element_text(size=9), 
+              plot.title = element_text(size = 10),
+              legend.position = "bottom")
+              
+grid.arrange(g1, g2, ncol =2)
+```
+
+```{r weight_table, echo=FALSE}
+mod1 <- lm(wt ~ transmission, data = mtcars)
+kable(summary(mod1)$coef, caption = "Linear Model Predicting Weight with Transmission")
+```
+
+Figure 1 is a plot showing the relationship between car weight and miles per gallon. The correlation between weight and MPG is -.867.
+
+Figure 2 is a boxplot showing the difference in weights for automatic vs. manual transmission cars.
+
+Table 2 shows that the difference in weights between manual and automatic transmission vehicles is statistically significant.
+
+
+Figure 1 shows that there is a strong negative relationship between weight and MPG. Also, it appears that manual transmission cars tend to weigh less than automatic transmission cars. This indicates that it is likely not transmission that is causing changes in MPG but rather the two transmission cars don't have equal weights. The boxplot and linear model aid with this interpretation. The table is showing that when cars have an automatic transmission, their average weight is 3.76 thousand pounds and when cars are manual transmission, their weight is 1.36 thousand pounds less than automatic transmission cars. To test to see how much transmission plays a role in predicting MPG when considering weight, we can do a multivariable linear regression model showing the coefficients and the $R^2$.
+
+```{r multi_model, echo=FALSE}
+mod2 <- lm(mpg ~ wt + transmission, data = mtcars)
+
+kable(summary(mod2)$coefficients, caption = "Linear Model Predicting MPG with Car Weight and Transmission")
+
+```
+
+The intercept value of 37.32 indicates what the MPG would be if weight (wt) were zero and if the transmission were automatic. This is not useful by itself, but we can see from the wt variable's slope that for every 1,000 pound increase in car weight, mpg goes down by about 5.35MPG (adjusting for transmission). This is statistically significant with a t-value of -6.79 and $p$ < .001. However, if we look at transmission, the estimate was very small and not statistically significant (t-value of -0.015 and $p$ =.987). This indicates that once you account for weight, transmission has no effect on mpg. The $R^2$ is .75, indicating that 75% of the variation is explained by weight (and negligibly transmission). As a diagnostic measure, we can see if any particular data points are heavily influecing the data using the `hatvalues` function.
+
+```{r hats, echo = FALSE}
+mod <- lm(mpg ~ wt + transmission, data = mtcars)
+kable(hatvalues(mod), caption = "Hat Values with MPG as the Outcome and Weight & Transmission as the Predictors")
+```
+
+A few of the cars do exert influence (the ones with the highest influence appear to be luxury cars) but this influence isn't excessive.
+
+Now that we know weight is a good predictor for mpg, we can test for other variables. However, while other variables may help explain more of the variation which would increase $R^2$, most of these variables have high correlations with weight, indicating the effects are somewhat bounded together. A way to test to see if the regressors are orthogonal to one another is to check the variance inflation factors for the variables using the `vif` function from the `car` package. This shows the increase in variance for the `i`th regressor compared to the ideal setting of indepedent regressors. We can do a multivariable linear model for several variables predicting MPG and then calculate the variables' VIFs. I chose a few variables that had the smallest correlations with the weight variable rather than including all of the variables. 
+
+```{r multi2, echo=FALSE}
+mod3 <- lm(mpg ~ wt + qsec + carb + gear, data = mtcars)
+kable(summary(mod3)$coefficients, caption = "Multivariate Linear Model Predicting MPG with Weight, Quarter Mile Time, Number of Carburetors and Number of Forward Gears")
+kable(vif(mod3), caption = "VIF for regressors")
+
+```
+
+Even though $R^2$ increased to .844, including correlated variables inflates the standard error of the model. The interpretation of the VIF table is that for each of these variables, the standard error for the MPG effect is more than triple from what it would be if the regressors were orthogonal to one another for the variables "wt", "carb" and "gear". For example, the number of carburetors variables has a VIF of 3.74, indicating its effect is 3.74 times what it would be if it were uncorrelated with the other variables. However, looking at the Table 2 correlation table and the VIF of the quarter mile time variable, we can see quarter mile time is somewhat uncorrelated with weight (VIF < 2). Also from the output, we can see "qsec" reached statistical significance, for $p$ < .05 while the "carb" and "gear" variables did not reach statistical significance. We can do a final model with only weight and quarter mile times as predictor variables for mpg to see the effect on the coefficients and $R^2$
+
+
+```{r last_table, echo=FALSE}
+mod4 <- lm(mpg ~ wt + qsec, data = mtcars)
+kable(summary(mod4)$coefficients, caption = "Multivariate Linear Model Predicting MPG with Weight & Quarter Mile Time")
+
+```
+
+With an $R^2$ of .826 and its inclusion is considered necessary according to the $p$ value. Including quarter mile time seems to benefit the model. The table shows that as quarter mile goes up, cars become more gas efficient.
+
+
+##Appendix(R code)
+
+```{r appendix, ref.label= knitr::all_labels(), eval=FALSE}
+
+```
+
